@@ -1,0 +1,49 @@
+-- Step 1: Create Master Key Encryption (if not already created)
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'YourSecurePassword';
+
+-- Step 2: Create Database Scoped Credential
+CREATE DATABASE SCOPED CREDENTIAL jaggi 
+WITH IDENTITY = 'Managed Identity';
+
+-- Step 3: Verify Credentials
+SELECT * FROM sys.database_credentials;
+
+-- Step 4: Create External File Format
+CREATE EXTERNAL FILE FORMAT extfileformat WITH (
+    FORMAT_TYPE = PARQUET,
+    DATA_COMPRESSION = 'org.apache.hadoop.io.compress.SnappyCodec'
+);
+
+-- Step 5: Create External Data Source
+CREATE EXTERNAL DATA SOURCE goldlayer WITH (
+    LOCATION = 'https://jaggiolistdata.dfs.core.windows.net/olistdata/gold/',
+    CREDENTIAL = jaggi
+);
+
+-- Step 6: Create Schema
+CREATE SCHEMA gold;
+
+-- Step 7: Create View for Silver Layer Data
+CREATE VIEW gold.final AS 
+SELECT *
+FROM OPENROWSET(
+    BULK 'https://jaggiolistdata.dfs.core.windows.net/olistdata/silver/',
+    FORMAT = 'PARQUET'
+) AS result1;
+
+-- Step 8: Verify the View
+SELECT * FROM gold.final;
+
+-- Step 9: Create External Table for Gold Layer
+CREATE EXTERNAL TABLE gold.finaltable WITH (
+    LOCATION = 'Serving',
+    DATA_SOURCE = goldlayer,
+    FILE_FORMAT = extfileformat
+) AS
+SELECT * FROM gold.final;
+
+-- Step 10: Verify External Table Data
+SELECT * FROM gold.finaltable;
+
+-- Step 11: Additional Check (if needed)
+SELECT * FROM gold.final2;
